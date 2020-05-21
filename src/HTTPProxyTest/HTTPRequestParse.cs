@@ -67,7 +67,10 @@ namespace HTTPProxyTest
                 }
                 if (key.ToLower() == "host")
                 {
+                    if(head.Length>2)
                     Host = HTTPRequestParser.DeleteFrontWhiteSpace(head[1] + ":" + head[2]);
+                    else
+                        Host = HTTPRequestParser.DeleteFrontWhiteSpace(head[1]);
                 }
             }
             List<HeaderPair> resovledheaders = new List<HeaderPair>();

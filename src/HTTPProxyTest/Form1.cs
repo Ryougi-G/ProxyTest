@@ -27,8 +27,9 @@ namespace HTTPProxyTest
             string ip = null;
             int rport = Convert.ToInt32(null);
             arg a = new arg(ip, port, rport);
-            Thread th = new Thread(new ParameterizedThreadStart(ReadRequest));
-            th.Start(a);
+            //Thread th = new Thread(new ParameterizedThreadStart(ReadRequest));
+            //th.Start(a);
+            ReadRequest(a);
         }
         private void ReadRequest(object ax)
         {
@@ -38,8 +39,9 @@ namespace HTTPProxyTest
             while (true)
             {
                 TcpClient client = server.AcceptTcpClient();
-                Thread nt = new Thread(DoProxy);
-                nt.Start(client);
+                //   Thread nt = new Thread(DoProxy);
+                //   nt.Start(client);
+                DoProxy(client);
             }
         }
         private void DoProxy(object ox)
@@ -67,21 +69,53 @@ namespace HTTPProxyTest
                 try
                 {
                     ResolvedHttpProxyRequest request = HTTPRequestParser.ResolveHTTPProxyRequest(content);
-                    TcpClient cst = new TcpClient();
-                    string[] spchost = request.Host.Split(':');
+                    
+                    if (request.Method.ToLower() == "connect")
+                    {
+                        TcpClient cst = new TcpClient();
+                        string[] spchost = request.Host.Split(':');
+                        int port;
+                        if (spchost.Length < 2)
+                        {
+                            port = Convert.ToInt32(request.URI.Split(':')[1]);
+                        }
+                        else if(spchost.Length<3)
+                        {
+                            port = 443;
+                        }
+                        else
+                        {
+                            port = Convert.ToInt32(spchost[2]);
+                        }
+                        MessageBox.Show(Convert.ToString(port));
+                        string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
+                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0],port);
+                        textBox1.Invoke(del, request.ResolvedRequest);
+                        NetworkStream serverstream = cst.GetStream();
+                        string res = "HTTP/1.1 200 Connection Established\r\nConnection: close\r\n\r\n";
+                        byte[] buf = Encoding.ASCII.GetBytes(res);
+                        ns.Write(buf, 0, buf.Length);
+                        //MessageBox.Show(res);
+                        TunnelCon(cst.Client, client.Client);
+                    }
+                    else
+                    {
+                        TcpClient cst = new TcpClient();
+                        string[] spchost = request.Host.Split(':');
+                        string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
+                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0], Convert.ToInt32(spchost[1]));
+                        textBox1.Invoke(del, request.ResolvedRequest);
+                        NetworkStream serverstream = cst.GetStream();
+                        byte[] buffer = Encoding.ASCII.GetBytes(request.ResolvedRequest);
+                        serverstream.Write(buffer, 0, buffer.Length);
+                        BridgeCon(serverstream, ns);
+                    }
                     // MessageBox.Show(spchost[0]);
                     //MessageBox.Show(spchost[1]);
-                    string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
-                    cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0], Convert.ToInt32(spchost[1]));
-                    textBox1.Invoke(del, request.ResolvedRequest);
-                    NetworkStream serverstream = cst.GetStream();
-                    serverstream.Write(Encoding.ASCII.GetBytes(request.ResolvedRequest), 0, Encoding.ASCII.GetByteCount(request.ResolvedRequest));
-                    BridgeCon(serverstream, ns);
-                    File.WriteAllText("test.txt", content);
                 }
                 catch(Exception ex)
                 {
-
+                  //  MessageBox.Show(ex.Message);
                 }
             }
         }
@@ -92,6 +126,7 @@ namespace HTTPProxyTest
         }
         private void BridgeCon(NetworkStream sns,NetworkStream cns)
         {
+            
             using(BinaryReader reader=new BinaryReader(sns))
             {
                 using(BinaryWriter writer=new BinaryWriter(cns))
@@ -110,6 +145,54 @@ namespace HTTPProxyTest
                     }
                 }
             }
+        }
+        private void TunnelCon(Socket sns,Socket cns)
+        {
+            //using (BinaryWriter fw = new BinaryWriter(new FileStream("t.txt", FileMode.Create)))
+            /*
+            using (BinaryReader reader = new BinaryReader(sns))
+            {
+                using (BinaryWriter swriter = new BinaryWriter(sns))
+                {
+                    using(BinaryReader creader=new BinaryReader(cns))
+                    {
+                        using (BinaryWriter writer = new BinaryWriter(cns))
+                        {
+                        */
+                            while (sns.Connected &&cns.Connected)
+                            {
+                                try
+                                {
+
+
+                                    byte[] buffer1 = new byte[1024];
+                                    int hasRead1 = sns.Receive(buffer1);
+                                    cns.Send(buffer1);
+
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show(ex.Message);
+                                    break;
+                                }
+                                try
+                                {
+                                    byte[] buffer = new byte[1024];
+                                    int hasRead = cns.Receive(buffer);
+                                    sns.Send(buffer);
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show(ex.Message);
+                                    break;
+                                }
+                            }
+                        //}
+                   // }
+                //}
+                
+                
+            //}
         }
     }
     class arg
