@@ -27,9 +27,10 @@ namespace HTTPProxyTest
             string ip = null;
             int rport = Convert.ToInt32(null);
             arg a = new arg(ip, port, rport);
-            //Thread th = new Thread(new ParameterizedThreadStart(ReadRequest));
-            //th.Start(a);
-            ReadRequest(a);
+            Thread th = new Thread(new ParameterizedThreadStart(ReadRequest));
+            th.IsBackground = true;
+            th.Start(a);
+            //ReadRequest(a);
         }
         private void ReadRequest(object ax)
         {
@@ -39,9 +40,10 @@ namespace HTTPProxyTest
             while (true)
             {
                 TcpClient client = server.AcceptTcpClient();
-                //   Thread nt = new Thread(DoProxy);
-                //   nt.Start(client);
-                DoProxy(client);
+                Thread nt = new Thread(DoProxy);
+                nt.IsBackground = true;
+                nt.Start(client);
+                //DoProxy(client);
             }
         }
         private void DoProxy(object ox)
@@ -87,16 +89,28 @@ namespace HTTPProxyTest
                         {
                             port = Convert.ToInt32(spchost[2]);
                         }
-                        MessageBox.Show(Convert.ToString(port));
+                        //MessageBox.Show(Convert.ToString(port));
                         string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
                         cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0],port);
+                       // MessageBox.Show(Convert.ToString(cst.Connected));
                         textBox1.Invoke(del, request.ResolvedRequest);
                         NetworkStream serverstream = cst.GetStream();
-                        string res = "HTTP/1.1 200 Connection Established\r\nConnection: close\r\n\r\n";
+                        string res = "HTTP/1.1 200 Connection Established\r\n\r\n";
+                        if (cst.Connected)
+                        {
+
+                        }
+                        else
+                        {
+                            res = "HTTP/1.1 404 Error\r\n\r\n";
+                        }
                         byte[] buf = Encoding.ASCII.GetBytes(res);
                         ns.Write(buf, 0, buf.Length);
                         //MessageBox.Show(res);
-                        TunnelCon(cst.Client, client.Client);
+                        object box1 = (object)(new TcpClient[] { client, cst });
+                        object box2 = (object)(new TcpClient[] { cst, client });
+                        ThreadPool.QueueUserWorkItem(new WaitCallback(TunnelCon), box1);
+                        ThreadPool.QueueUserWorkItem(new WaitCallback(TunnelCon), box2);
                     }
                     else
                     {
@@ -146,53 +160,43 @@ namespace HTTPProxyTest
                 }
             }
         }
-        private void TunnelCon(Socket sns,Socket cns)
+        private void TunnelCon(object x)
         {
-            //using (BinaryWriter fw = new BinaryWriter(new FileStream("t.txt", FileMode.Create)))
-            /*
-            using (BinaryReader reader = new BinaryReader(sns))
+            TcpClient client = ((TcpClient[])x)[0];
+            TcpClient server = ((TcpClient[])x)[1];
+            //MessageBox.Show(Convert.ToString(client.Connected)+Convert.ToString(client.Connected));
+            try
             {
-                using (BinaryWriter swriter = new BinaryWriter(sns))
+                NetworkStream ns1 = client.GetStream();
+                NetworkStream ns2 = server.GetStream();
+                while (true)
                 {
-                    using(BinaryReader creader=new BinaryReader(cns))
+                    try
                     {
-                        using (BinaryWriter writer = new BinaryWriter(cns))
-                        {
+                        byte[] bt = new byte[10240];
+                        int count = ns1.Read(bt, 0, bt.Length);
+                        ns2.Write(bt, 0, count);
+                    }
+                    catch
+                    {
+                        /*
+                        ns1.Dispose();
+                        ns2.Dispose();
+                        client.Close();
+                        server.Close();
                         */
-                            while (sns.Connected &&cns.Connected)
-                            {
-                                try
-                                {
-
-
-                                    byte[] buffer1 = new byte[1024];
-                                    int hasRead1 = sns.Receive(buffer1);
-                                    cns.Send(buffer1);
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    MessageBox.Show(ex.Message);
-                                    break;
-                                }
-                                try
-                                {
-                                    byte[] buffer = new byte[1024];
-                                    int hasRead = cns.Receive(buffer);
-                                    sns.Send(buffer);
-                                }
-                                catch (Exception ex)
-                                {
-                                    MessageBox.Show(ex.Message);
-                                    break;
-                                }
-                            }
-                        //}
-                   // }
-                //}
+                        
+                        break;
+                    }
+                }
+            }catch(Exception ex)
+            {
                 
-                
-            //}
+                /*
+                client.Close();
+                server.Close();
+                */
+            }
         }
     }
     class arg
