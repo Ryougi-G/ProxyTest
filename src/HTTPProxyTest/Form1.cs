@@ -67,7 +67,7 @@ namespace HTTPProxyTest
                     }
                 }
                 SetStrDelegate del = SetStr;
-                textBox1.Invoke(del, content);
+                //textBox1.Invoke(del, content);
                 try
                 {
                     ResolvedHttpProxyRequest request = HTTPRequestParser.ResolveHTTPProxyRequest(content);
@@ -106,11 +106,32 @@ namespace HTTPProxyTest
                         }
                         byte[] buf = Encoding.ASCII.GetBytes(res);
                         ns.Write(buf, 0, buf.Length);
+                        ns.Flush();
                         //MessageBox.Show(res);
-                        object box1 = (object)(new TcpClient[] { client, cst });
+                       // object box1 = (object)(new TcpClient[] { client, cst });
                         object box2 = (object)(new TcpClient[] { cst, client });
-                        ThreadPool.QueueUserWorkItem(new WaitCallback(TunnelCon), box1);
-                        ThreadPool.QueueUserWorkItem(new WaitCallback(TunnelCon), box2);
+                        //ThreadPool.QueueUserWorkItem(new WaitCallback(TunnelCon), box1);
+                        Thread Wt = new Thread(new ParameterizedThreadStart(TunnelCon));
+                        Wt.IsBackground = true;
+                        Wt.Start(box2);
+                        try
+                        {
+                            NetworkStream ns1 = client.GetStream();
+                            NetworkStream ns2 = cst.GetStream();
+                            int hasRead;
+                            do
+                            {
+                                byte[] buf2 = new byte[4096];
+                                hasRead = ns1.Read(buf2, 0, 4096);
+                                ns2.Write(buf2, 0, hasRead);
+                            } while (hasRead >= 0);
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Close();
+                            cst.Close();
+
+                        }
                     }
                     else
                     {
@@ -122,6 +143,7 @@ namespace HTTPProxyTest
                         NetworkStream serverstream = cst.GetStream();
                         byte[] buffer = Encoding.ASCII.GetBytes(request.ResolvedRequest);
                         serverstream.Write(buffer, 0, buffer.Length);
+                        serverstream.Flush();
                         BridgeCon(serverstream, ns);
                     }
                     // MessageBox.Show(spchost[0]);
@@ -165,37 +187,23 @@ namespace HTTPProxyTest
             TcpClient client = ((TcpClient[])x)[0];
             TcpClient server = ((TcpClient[])x)[1];
             //MessageBox.Show(Convert.ToString(client.Connected)+Convert.ToString(client.Connected));
+            
             try
             {
                 NetworkStream ns1 = client.GetStream();
                 NetworkStream ns2 = server.GetStream();
-                while (true)
+                int hasRead;
+                do
                 {
-                    try
-                    {
-                        byte[] bt = new byte[10240];
-                        int count = ns1.Read(bt, 0, bt.Length);
-                        ns2.Write(bt, 0, count);
-                    }
-                    catch
-                    {
-                        /*
-                        ns1.Dispose();
-                        ns2.Dispose();
-                        client.Close();
-                        server.Close();
-                        */
-                        
-                        break;
-                    }
-                }
+                    byte[] buf = new byte[4096];
+                    hasRead = ns1.Read(buf, 0, 4096);
+                    ns2.Write(buf, 0, hasRead);
+                } while (hasRead >= 0);
             }catch(Exception ex)
             {
-                
-                /*
                 client.Close();
                 server.Close();
-                */
+                
             }
         }
     }
