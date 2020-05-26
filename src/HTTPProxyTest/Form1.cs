@@ -121,6 +121,7 @@ namespace HTTPProxyTest
                             int hasRead;
                             do
                             {
+                                Thread.Sleep(1);
                                 byte[] buf2 = new byte[4096];
                                 hasRead = ns1.Read(buf2, 0, 4096);
                                 ns2.Write(buf2, 0, hasRead);
@@ -195,6 +196,7 @@ namespace HTTPProxyTest
                 int hasRead;
                 do
                 {
+                    Thread.Sleep(1);
                     byte[] buf = new byte[4096];
                     hasRead = ns1.Read(buf, 0, 4096);
                     ns2.Write(buf, 0, hasRead);
