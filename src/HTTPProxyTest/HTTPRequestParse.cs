@@ -55,11 +55,6 @@ namespace HTTPProxyTest
             string Method = firstLineParas[0];string URI = firstLineParas[1];string HttpInfo = firstLineParas[2];
             //原始头部集合（List类似于C++中的Vector）
             List<HeaderPair> rawHeader=new List<HeaderPair>();
-            //HTTP的Connection属性
-            List<string> Connection=new List<string>();
-            //HTTP的Proxy-tion属性
-            List<string> ProxyConnection = new List<string>();
-            string Host="";
             //对于每一个头部进行处理
             for(int i=1;i<allHeaders.Length;i++)
             {
@@ -73,24 +68,15 @@ namespace HTTPProxyTest
                 string[] head=header.Split(':');
                 //获取该头部的名称（key）和值（value）
                 string key = head[0];
-                string value = DeleteFrontWhiteSpace(head[1]);
+                string value = "";
+                for(int j = 1; j < head.Length; j++)
+                {
+                    value += head[j];
+                }
+                value = DeleteFrontWhiteSpace(head[1]);
                 //添加到原始头部集合中
                 rawHeader.Add(new HeaderPair(key, value));
-                //接下来是对一些特殊头部单独处理
-                if (key.ToLower() == "connection")
-                {
-                    foreach(string s in value.Split(','))
-                    {
-                        Connection.Add(s);
-                    }
-                }
-                if (key.ToLower() == "proxy-connection")
-                {
-                    foreach (string s in value.Split(','))
-                    {
-                        ProxyConnection.Add(s);
-                    }
-                }
+                /*
                 if (key.ToLower() == "host")
                 {
                     if(head.Length>2)
@@ -98,6 +84,7 @@ namespace HTTPProxyTest
                     else
                         Host = HTTPRequestParser.DeleteFrontWhiteSpace(head[1]);
                 }
+                */
             }
             //初始化解析结果并将原头部添加进去等待下一步处理
             List<HeaderPair> resovledheaders = new List<HeaderPair>();
@@ -133,7 +120,7 @@ namespace HTTPProxyTest
             }
             resolvedreq += "\r\n";
             //生成结果并返回
-            ResolvedHttpProxyRequest result = new ResolvedHttpProxyRequest(Host, Method, Connection, ProxyConnection, rawRequest, resolvedreq, URI, HttpInfo, rawHeader, resovledheaders);
+            ResolvedHttpProxyRequest result = new ResolvedHttpProxyRequest( Method,resolvedreq , URI, HttpInfo,resovledheaders);
             return result;
         }
     }
@@ -143,36 +130,114 @@ namespace HTTPProxyTest
     /// </summary>
     public class ResolvedHttpProxyRequest
     {
-        public string Host
+        public int Port
         {
-            get;
-            private set;
+            get
+            {
+                foreach (string s in URI.Split(':'))
+                {
+                    try
+                    {
+                        return Convert.ToInt32(s);
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
+                if (Method != HTTPMethod.Connect)
+                {
+                    return 80;
+                }
+                else
+                {
+                    return 443;
+                }
+            }
+        }
+        public HeaderPair Host
+        {
+            get
+            {
+                foreach (HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if (header.Key.ToLower() == "host")
+                    {
+                        return header;
+                    }
+                }
+                return null;
+            }
+            set
+            {
+                foreach (HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if (header.Key.ToLower() == "host")
+                    {
+                        header.Value = value.Value;
+                    }
+                }
+            }
         }
         public string Method
         {
             get;
             private set;
         }
-        public List<string> Connection
+        public HeaderPair Connection
+        {
+            get
+            {
+                foreach (HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if (header.Key.ToLower() == "connection")
+                    {
+                        return header;
+                    }
+                }
+                return null;
+            }
+            set
+            {
+                foreach (HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if (header.Key.ToLower() == "connection")
+                    {
+                        header.Value = value.Value;
+                    }
+                }
+            }
+        }
+        public HeaderPair Proxy_Connection
+        {
+            get
+            {
+                foreach(HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if(header.Key.ToLower()== "proxy-connection")
+                    {
+                        return header;
+                    }
+                }
+                return null;
+            }
+            set
+            {
+                foreach (HeaderPair header in HeadersExceptFirstLine)
+                {
+                    if (header.Key.ToLower() == "proxy-connection")
+                    {
+                        header.Value=value.Value;
+                    }
+                }
+            }
+        }
+        public string RequestString
         {
             get;
             private set;
         }
-        public List<string> Proxy_Connection
-        {
-            get;
-            private set;
-        }
-        public string RawRequest
-        {
-            get;
-            private set;
-        }
-        public string ResolvedRequest
-        {
-            get;
-            private set;
-        }
+        
         public string URI
         {
             get;
@@ -183,15 +248,10 @@ namespace HTTPProxyTest
             get;
             private set;
         }
-        public List<HeaderPair> RawHeadersExceptFirstLine
+        public List<HeaderPair> HeadersExceptFirstLine
         {
             get;
             private set;
-        }
-        public List<HeaderPair> ResolvedHeadersExceptFirstLine
-        {
-            get;
-            set;
         }
         /// <summary>
         /// 这是构造函数
@@ -200,30 +260,34 @@ namespace HTTPProxyTest
         /// <param name="method"></param>
         /// <param name="connection"></param>
         /// <param name="proxy_connection"></param>
-        /// <param name="rawRequest"></param>
-        /// <param name="resolvedrequest"></param>
         /// <param name="uri"></param>
         /// <param name="httpver"></param>
-        /// <param name="rawheaders"></param>
-        /// <param name="resheaders"></param>
-        public ResolvedHttpProxyRequest(string host,string method,List<string> connection,List<string> proxy_connection,string rawRequest,string resolvedrequest,string uri,string httpver,List<HeaderPair> rawheaders,List<HeaderPair> resheaders)
+        public ResolvedHttpProxyRequest(string method,string requestString,string uri,string httpver,List<HeaderPair> headers)
         {
-            Host = host;
             Method = method;
-            Connection = connection;
-            Proxy_Connection = proxy_connection;
-            RawRequest = rawRequest;
-            ResolvedRequest = resolvedrequest;
             URI = uri;
             HTTPInfo = httpver;
-            RawHeadersExceptFirstLine = rawheaders;
-            ResolvedHeadersExceptFirstLine = resheaders;
+            HeadersExceptFirstLine = headers;
+            RequestString = requestString;
         }
         
     }
     /// <summary>
     /// 这是表示一个头部的类
     /// </summary>
+    public static class HTTPMethod
+    {
+        
+        public static string Connect = "CONNECT";
+        public static string Get = "GET";
+        public static string Post = "POST";
+        public static string Put = "PUT";
+        public static string Delete = "DELETE";
+        public static string Options="OPTIONS";
+        public static string Trace= "TRACE";
+        public static string Head = "HEAD";
+        public static string Patch = "PATCH";
+    }
     public class HeaderPair
     {
         public string Key

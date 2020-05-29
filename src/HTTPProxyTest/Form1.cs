@@ -75,25 +75,12 @@ namespace HTTPProxyTest
                     if (request.Method.ToLower() == "connect")
                     {
                         TcpClient cst = new TcpClient();
-                        string[] spchost = request.Host.Split(':');
-                        int port;
-                        if (spchost.Length < 2)
-                        {
-                            port = Convert.ToInt32(request.URI.Split(':')[1]);
-                        }
-                        else if(spchost.Length<3)
-                        {
-                            port = 443;
-                        }
-                        else
-                        {
-                            port = Convert.ToInt32(spchost[2]);
-                        }
+                        string[] spchost = request.Host.Value.Split(':');
                         //MessageBox.Show(Convert.ToString(port));
                         string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
-                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0],port);
+                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0],request.Port);
                        // MessageBox.Show(Convert.ToString(cst.Connected));
-                        textBox1.Invoke(del, request.ResolvedRequest);
+                        textBox1.Invoke(del, request.RequestString);
                         NetworkStream serverstream = cst.GetStream();
                         string res = "HTTP/1.1 200 Connection Established\r\n\r\n";
                         if (cst.Connected)
@@ -137,12 +124,13 @@ namespace HTTPProxyTest
                     else
                     {
                         TcpClient cst = new TcpClient();
-                        string[] spchost = request.Host.Split(':');
+                        string[] spchost = request.Host.Value.Split(':');
                         string s = HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0]);
-                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0], Convert.ToInt32(spchost[1]));
-                        textBox1.Invoke(del, request.ResolvedRequest);
+                        MessageBox.Show(request.RequestString);
+                        cst.Connect(Dns.GetHostEntry(HTTPRequestParser.DeleteFrontWhiteSpace(spchost[0])).AddressList[0],request.Port);
+                        textBox1.Invoke(del, request.RequestString);
                         NetworkStream serverstream = cst.GetStream();
-                        byte[] buffer = Encoding.ASCII.GetBytes(request.ResolvedRequest);
+                        byte[] buffer = Encoding.ASCII.GetBytes(request.RequestString);
                         serverstream.Write(buffer, 0, buffer.Length);
                         serverstream.Flush();
                         BridgeCon(serverstream, ns);
